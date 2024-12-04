@@ -13,13 +13,13 @@ type
     FCost: integer;
     FHcost: integer;
     FMap: integer;
-    FState: integer;
+    FClosed: Boolean;
     FX: integer;
     FY: integer;
     FP: TData;
     function GetScore: integer;
   public
-    property state: integer read FState write FState;
+    property closed: Boolean read FClosed write FClosed;
     property x: integer read FX write FX;
     property y: integer read FY write FY;
     property cost: integer read FCost write FCost;
@@ -30,15 +30,16 @@ type
   end;
 
   TGrid = class
-  const
-    max = 15;
   private
     function GetState(x, y: integer): TData;
     procedure SetState(x, y: integer; const Value: TData);
   protected
-    FGrid: array [0 .. max - 1, 0 .. max - 1] of TData;
+    FGrid: array of TData;
+    FCol, FRow: integer;
+    property col: integer read FCol write FCol;
+    property row: integer read FRow write FRow;
   public
-    constructor Create;
+    constructor Create(x, y: integer);
     destructor Destroy; override;
     procedure make; virtual;
     property state[x, y: integer]: TData read GetState write SetState; default;
@@ -68,10 +69,6 @@ implementation
 uses System.Types, System.Generics.Collections, System.Contnrs, System.Math;
 
 const
-  none = 0;
-  open = 1;
-  closed = 2;
-
   tilt = 10;
 
 var
@@ -89,34 +86,33 @@ begin
   min_cost := 999;
   result := -1;
   for var i := 0 to list.Count - 1 do
-  begin
-    data := list[i];
-    if min > data.score then
-      min := data.score
-    else if (min = data.score) and (min_cost > data.cost) then
-      min_cost := data.cost
-    else
-      continue;
-    result := i
-  end;
+    if not list[i].closed then
+    begin
+      data := list[i];
+      if min > data.score then
+        min := data.score
+      else if (min = data.score) and (min_cost > data.cost) then
+        min_cost := data.cost
+      else
+        continue;
+      result := i
+    end;
 end;
 
 function open_op(data: TData; cost: integer): Boolean;
 begin
-  result := true;
-  case data.state of
-    open:
-      if data.cost <= cost + data.map then
-        result := false
-      else
-        data.cost := cost + data.map;
-    none:
-      begin
-        data.cost := cost + data.map;
-        data.state := open;
-        data.hcost := Abs(gt.x - data.x) + Abs(gt.y - data.y);
-        list.Add(data);
-      end;
+  if list.IndexOf(data) = -1 then
+  begin
+    data.cost := cost + data.map;
+    data.hcost := Abs(gt.x - data.x) + Abs(gt.y - data.y);
+    list.Add(data);
+  end;
+  if data.cost < cost + data.map then
+    result := false
+  else if not data.closed then
+  begin
+    data.cost := cost + data.map;
+    result := true;
   end;
 end;
 
@@ -126,14 +122,11 @@ var
   data: TData;
   items: array [0 .. 3] of TData;
 begin
-  if list.Count > 0 then
-  begin
-    data := list[0];
-    data.state := closed;
-    list.Delete(0);
-  end
-  else
+  id := get_small;
+  if id = -1 then
     Exit;
+  data := list[id];
+  data.closed := true;
   x := data.x;
   y := data.y;
   if gt = Point(x, y) then
@@ -146,12 +139,9 @@ begin
   items[2] := grid[x - 1, y];
   items[3] := grid[x, y + 1];
   for var d in items do
-    if Assigned(d) and (d.map < tilt) and (d.state <> closed) then
+    if Assigned(d) and (d.map < tilt) then
       if open_op(d, data.cost) then
         d.p := data;
-  id := get_small;
-  if id > -1 then
-    list.Move(id, 0);
   a_star;
 end;
 
@@ -201,12 +191,11 @@ procedure TForm1.FormCreate(Sender: TObject);
 var
   data: TData;
 begin
-  grid := TGrid.Create;
+  grid := TGrid.Create(DrawGrid1.ColCount, DrawGrid1.RowCount);
   list := TList<TData>.Create;
-  st := Point(4 - 1, 5 - 1);
-  gt := Point(7 - 1, 6 - 1);
+  st := Point(3, 3);
+  gt := Point(8, 6);
   data := grid[st.x, st.y];
-  data.state := open;
   list.Add(data);
   a_star;
 end;
@@ -226,39 +215,41 @@ end;
 
 { TGrid }
 
-constructor TGrid.Create;
+constructor TGrid.Create(x, y: integer);
 var
   data: TData;
 begin
-  inherited;
-  for var i := 0 to max - 1 do
-    for var j := 0 to max - 1 do
-    begin
-      data := TData.Create;
-      data.state := none;
-      data.x := i;
-      data.y := j;
-      data.cost := 0;
-      data.hcost := 0;
-      data.p := nil;
-      data.map := 1;
-      FGrid[i, j] := data;
-    end;
+  inherited Create;
+  FCol := x;
+  FRow := y;
+  SetLength(FGrid, x * y);
+  for var i := 0 to High(FGrid) do
+  begin
+    data := TData.Create;
+    data.closed := false;
+    data.x := i mod x;
+    data.y := i div x;
+    data.cost := 0;
+    data.hcost := 0;
+    data.p := nil;
+    data.map := 1;
+    FGrid[i] := data;
+  end;
   make;
 end;
 
 destructor TGrid.Destroy;
 begin
-  for var i := 0 to max - 1 do
-    for var j := 0 to max - 1 do
-      FGrid[i, j].Free;
+  for var d in FGrid do
+    d.Free;
+  Finalize(FGrid);
   inherited;
 end;
 
 function TGrid.GetState(x, y: integer): TData;
 begin
-  if (x >= 0) and (x < max) and (y >= 0) and (y < max) then
-    result := FGrid[x, y]
+  if (x >= 0) and (x < col) and (y >= 0) and (y < row) then
+    result := FGrid[y * col + x]
   else
     result := nil;
 end;
@@ -266,19 +257,18 @@ end;
 procedure TGrid.make;
 begin
   for var i := 4 to 6 do
-    FGrid[6 - 1, i - 1].map := tilt;
+    state[6, i].map := tilt;
 
-  FGrid[5, 6].map := tilt;
-  FGrid[6, 4].map := tilt;
+  state[5, 6].map := tilt;
   {
-    FGrid[7, 5].map := tilt;
-    FGrid[6, 6].map := tilt; }
+    state[7, 5].map := tilt;
+    state[6, 6].map := tilt;}
 end;
 
 procedure TGrid.SetState(x, y: integer; const Value: TData);
 begin
-  if (x >= 0) and (x < max) and (y >= 0) and (y < max) then
-    FGrid[x, y] := Value;
+  if (x >= 0) and (x < col) and (y >= 0) and (y < row) then
+    FGrid[y * col + x] := Value;
 end;
 
 end.
