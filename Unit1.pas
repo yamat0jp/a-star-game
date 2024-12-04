@@ -257,10 +257,10 @@ end;
 
 procedure TGrid.make;
 begin
-  for var i := 4 to 6 do
+  for var i := 2 to 6 do
     state[6, i].map := tilt;
-
-  state[5, 6].map := tilt;
+  for var i := 3 to 5 do
+    state[i, 6].map := tilt;
   {
     state[7, 5].map := tilt;
     state[6, 6].map := tilt; }
