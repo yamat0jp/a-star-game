@@ -109,9 +109,10 @@ begin
   end;
   if data.cost < cost + data.map then
     result := false
-  else if not data.closed then
+  else
   begin
     data.cost := cost + data.map;
+    data.closed := false;
     result := true;
   end;
 end;
@@ -262,7 +263,7 @@ begin
   state[5, 6].map := tilt;
   {
     state[7, 5].map := tilt;
-    state[6, 6].map := tilt;}
+    state[6, 6].map := tilt; }
 end;
 
 procedure TGrid.SetState(x, y: integer; const Value: TData);
