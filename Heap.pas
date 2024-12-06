@@ -14,12 +14,12 @@ type
     function GetParentIndex(Index: Integer): Integer;
     function GetLeftChildIndex(Index: Integer): Integer;
     function GetRightChildIndex(Index: Integer): Integer;
-    procedure HeapifyUp;
-    procedure HeapifyDown;
     function GetCount: Integer;
   protected
     FItems: TList<T>;
     FFunc: THikakuFunc;
+    procedure HeapifyUp(Index: integer);
+    procedure HeapifyDown(Index: integer);
     function Hikaku(Little, Large: T): Boolean; virtual;
   public
     constructor Create(AFunc: THikakuFunc);
@@ -63,13 +63,11 @@ begin
   result := (2 * Index) + 2;
 end;
 
-procedure THeap<T>.HeapifyUp;
+procedure THeap<T>.HeapifyUp(Index: integer);
 var
-  Index: Integer;
   ParentIndex: Integer;
   Temp: T;
 begin
-  Index := FItems.Count - 1;
   while Index > 0 do
   begin
     ParentIndex := GetParentIndex(Index);
@@ -92,12 +90,11 @@ begin
   result := FItems.IndexOf(Value);
 end;
 
-procedure THeap<T>.HeapifyDown;
+procedure THeap<T>.HeapifyDown(Index: integer);
 var
-  Index, LeftChild, RightChild, SmallestChild: Integer;
+  LeftChild, RightChild, SmallestChild: Integer;
   Temp: T;
 begin
-  Index := 0;
   while true do
   begin
     LeftChild := GetLeftChildIndex(Index);
@@ -125,7 +122,7 @@ end;
 procedure THeap<T>.Add(Item: T);
 begin
   FItems.Add(Item);
-  HeapifyUp;
+  HeapifyUp(FItems.Count-1);
 end;
 
 function THeap<T>.Extract: T;
@@ -136,7 +133,7 @@ begin
   result := FItems[0];
   FItems[0] := FItems[FItems.Count - 1];
   FItems.Delete(FItems.Count - 1);
-  HeapifyDown;
+  HeapifyDown(0);
 end;
 
 function THeap<T>.Peek: T;

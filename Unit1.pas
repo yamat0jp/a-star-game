@@ -71,7 +71,7 @@ uses System.Types, System.Contnrs, System.Math, Heap;
 type
   THeapData = class(THeap<TData>)
   protected
-    function Hikaku(Little, Large: TData): Boolean; override;
+    // function Hikaku(Little, Large: TData): Boolean; override;
   public
     constructor Create;
     procedure Update(Item: TData);
@@ -88,7 +88,7 @@ var
 
 function open_op(data: TData; cost: integer): Boolean;
 begin
-  if list.IndexOf(data) = -1 then
+  if (data.closed = false) and (list.IndexOf(data) = -1) then
   begin
     data.cost := cost + data.map;
     data.hcost := Abs(gt.x - data.x) + Abs(gt.y - data.y);
@@ -265,23 +265,25 @@ end;
 
 constructor THeapData.Create;
 begin
-  inherited Create(nil);
-end;
-
-function THeapData.Hikaku(Little, Large: TData): Boolean;
-begin
-  if Little.score < Large.score then
-    result := true
-  else if Little.score > Large.score then
-    result := false
-  else
-    result := Little.hcost < Large.hcost;
+  inherited Create(
+    function(Little, Large: TData): Boolean
+    begin
+      if Little.score < Large.score then
+        result := true
+      else if Little.score > Large.score then
+        result := false
+      else
+        result := Little.hcost < Large.hcost;
+    end);
 end;
 
 procedure THeapData.Update(Item: TData);
+var
+  id: integer;
 begin
-  FItems.Delete(FItems.IndexOf(Item));
-  FItems.Add(Item);
+  id := FItems.IndexOf(Item);
+  HeapifyUp(id);
+  HeapifyDown(id);
 end;
 
 end.
