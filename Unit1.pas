@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
-  System.Classes, Vcl.Graphics,
+  System.Classes, System.Generics.Collections, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Grids;
 
 type
@@ -66,7 +66,16 @@ implementation
 
 {$R *.dfm}
 
-uses System.Types, System.Generics.Collections, System.Contnrs, System.Math;
+uses System.Types, System.Contnrs, System.Math, Heap;
+
+type
+  THeapData = class(THeap<TData>)
+  protected
+    function Hikaku(Little, Large: TData): Boolean; override;
+  public
+    constructor Create;
+    procedure Update(Item: TData);
+  end;
 
 const
   tilt = 10;
@@ -74,30 +83,8 @@ const
 var
   st, gt: TPoint;
   grid: TGrid;
-  list: TList<TData>;
+  list: THeapData;
   ans: array [0 .. 999] of TData;
-
-function get_small: integer;
-var
-  min, min_cost: integer;
-  data: TData;
-begin
-  min := 999;
-  min_cost := 999;
-  result := -1;
-  for var i := 0 to list.Count - 1 do
-    if not list[i].closed then
-    begin
-      data := list[i];
-      if min > data.score then
-        min := data.score
-      else if (min = data.score) and (min_cost > data.cost) then
-        min_cost := data.cost
-      else
-        continue;
-      result := i
-    end;
-end;
 
 function open_op(data: TData; cost: integer): Boolean;
 begin
@@ -106,27 +93,31 @@ begin
     data.cost := cost + data.map;
     data.hcost := Abs(gt.x - data.x) + Abs(gt.y - data.y);
     list.Add(data);
+    result := true;
+    Exit;
   end;
-  if data.cost < cost + data.map then
+  if data.cost <= cost + data.map then
     result := false
   else
   begin
     data.cost := cost + data.map;
     data.closed := false;
+    list.Update(data);
     result := true;
   end;
 end;
 
 procedure a_star;
 var
-  x, y, id: integer;
+  x, y: integer;
   data: TData;
   items: array [0 .. 3] of TData;
 begin
-  id := get_small;
-  if id = -1 then
-    Exit;
-  data := list[id];
+  repeat
+    if list.Count = 0 then
+      Exit;
+    data := list.Extract;
+  until not data.closed;
   data.closed := true;
   x := data.x;
   y := data.y;
@@ -186,18 +177,16 @@ end;
 procedure TForm1.DrawGrid1FixedCellClick(Sender: TObject; ACol, ARow: LongInt);
 begin
   grid[ACol, ARow].map := tilt;
+  DrawGrid1.Repaint;
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
-var
-  data: TData;
 begin
   grid := TGrid.Create(DrawGrid1.ColCount, DrawGrid1.RowCount);
-  list := TList<TData>.Create;
+  list := THeapData.Create;
   st := Point(3, 3);
   gt := Point(8, 6);
-  data := grid[st.x, st.y];
-  list.Add(data);
+  list.Add(grid[st.x, st.y]);
   a_star;
 end;
 
@@ -270,6 +259,29 @@ procedure TGrid.SetState(x, y: integer; const Value: TData);
 begin
   if (x >= 0) and (x < col) and (y >= 0) and (y < row) then
     FGrid[y * col + x] := Value;
+end;
+
+{ THeapData }
+
+constructor THeapData.Create;
+begin
+  inherited Create(nil);
+end;
+
+function THeapData.Hikaku(Little, Large: TData): Boolean;
+begin
+  if Little.score < Large.score then
+    result := true
+  else if Little.score > Large.score then
+    result := false
+  else
+    result := Little.hcost < Large.hcost;
+end;
+
+procedure THeapData.Update(Item: TData);
+begin
+  FItems.Delete(FItems.IndexOf(Item));
+  FItems.Add(Item);
 end;
 
 end.
